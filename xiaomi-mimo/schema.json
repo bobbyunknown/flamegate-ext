@@ -1,0 +1,12 @@
+{
+  "slug": "xiaomi-mimo",
+  "name": "Xiaomi MiMo",
+  "version": "0.1.0",
+  "description": "Xiaomi MiMo extension via WASM (Rust). Pay-as-you-go API key auth.",
+  "entrypoints": {
+    "chat": "invoke",
+    "models": "list_models"
+  },
+  "timeout": 120,
+  "default_account_key": "default"
+}

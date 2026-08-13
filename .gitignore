@@ -1,0 +1,11 @@
+# Target & Build outputs
+target/
+dist/
+*.wasm
+*.out
+*.test
+
+# OS & Editor
+.DS_Store
+.vscode/
+.idea/
