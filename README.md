@@ -10,7 +10,6 @@ Extensions allow FlameGate to interface with specialized LLM providers, custom A
 
 | Extension | Language | Description | Auth Mode |
 |---|---|---|---|
-| [`codex`](./codex/) | Go (TinyGo) | OpenAI Codex integration via Responses API | OAuth2 |
 | [`xiaomi-mimo`](./xiaomi-mimo/) | Rust | Xiaomi MiMo AI integration | API Key |
 
 ---
@@ -27,16 +26,7 @@ Extensions allow FlameGate to interface with specialized LLM providers, custom A
 
 To build a specific extension into a WebAssembly binary:
 
-#### 1. Build OpenAI Codex (TinyGo)
-
-```bash
-cd codex
-make build
-```
-
-The compiled WebAssembly artifact will be generated at `codex/dist/codex.wasm`.
-
-#### 2. Build Xiaomi MiMo (Rust)
+#### 1. Build Xiaomi MiMo (Rust)
 
 ```bash
 cd xiaomi-mimo
@@ -53,12 +43,6 @@ Every extension directory contains a manifest file (`schema.json`) and the WebAs
 
 ```
 flamegate-ext/
-├── codex/
-│   ├── schema.json          # Extension metadata & entrypoints
-│   ├── main.go              # Go WASM source code
-│   ├── Makefile             # Build target definition
-│   └── dist/
-│       └── codex.wasm       # Compiled WASM binary
 └── xiaomi-mimo/
     ├── schema.json
     ├── Cargo.toml
