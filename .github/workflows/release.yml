@@ -3,7 +3,23 @@ name: Release extension
 on:
   push:
     tags:
-      - "*-v*" # e.g. xiaomi-mimo-v0.1.3
+      - "*-v*" # e.g. cline-v0.1.0, xiaomi-mimo-v0.1.0
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: "Extension slug to build & release"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - cline
+          - xiaomi-mimo
+      version:
+        description: "Version override (leave empty to use version from schema.json)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -33,40 +49,70 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Parse tag → slug + version
-        id: parse
-        shell: bash
-        run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          SLUG="${TAG%-v*}"
-          VERSION="${TAG##*-v}"
-          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
       - name: Build publisher CLI tool
         run: |
           go build -C publisher -o /usr/local/bin/flamegate-publisher .
 
-      - name: Build extension WASM
+      - name: Determine extensions to build
+        id: plan
+        shell: bash
         run: |
-          flamegate-publisher build "${{ steps.parse.outputs.slug }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            SLUG="${TAG%-v*}"
+            VERSION="${TAG##*-v}"
+            echo "items=[{\"slug\":\"$SLUG\",\"version\":\"$VERSION\",\"tag\":\"$TAG\"}]" >> "$GITHUB_OUTPUT"
+          else
+            SELECTED="${{ inputs.slug }}"
+            VERSION_INPUT="${{ inputs.version }}"
 
-      - name: "Bundle + sign (community: signs only when key set)"
-        env:
-          FLAMEGATE_SIGNING_KEY: ${{ secrets.FLAMEGATE_SIGNING_KEY }}
-        run: |
-          flamegate-publisher bundle \
-            "${{ steps.parse.outputs.slug }}" \
-            "${{ steps.parse.outputs.version }}" \
-            --out "${{ steps.parse.outputs.slug }}-${{ steps.parse.outputs.version }}.zip"
+            if [ "$SELECTED" = "all" ]; then
+              SLUGS="cline xiaomi-mimo"
+            else
+              SLUGS="$SELECTED"
+            fi
 
-      - name: Create release and upload asset
+            ITEMS="[]"
+            for s in $SLUGS; do
+              if [ -n "$VERSION_INPUT" ]; then
+                v="$VERSION_INPUT"
+              else
+                v=$(jq -r '.version // "0.1.0"' "$s/schema.json")
+              fi
+              t="${s}-v${v}"
+              ITEMS=$(echo "$ITEMS" | jq --arg s "$s" --arg v "$v" --arg t "$t" '. + [{"slug": $s, "version": $v, "tag": $t}]')
+            done
+            echo "items=$ITEMS" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build, bundle, and release extensions
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FLAMEGATE_SIGNING_KEY: ${{ secrets.FLAMEGATE_SIGNING_KEY }}
+          ITEMS_JSON: ${{ steps.plan.outputs.items }}
         run: |
-          gh release create \
-            "${{ steps.parse.outputs.tag }}" \
-            "${{ steps.parse.outputs.slug }}-${{ steps.parse.outputs.version }}.zip" \
-            --repo "${{ github.repository }}" \
-            --generate-notes
+          echo "$ITEMS_JSON" | jq -c '.[]' | while read -r item; do
+            slug=$(echo "$item" | jq -r '.slug')
+            version=$(echo "$item" | jq -r '.version')
+            tag=$(echo "$item" | jq -r '.tag')
+            zip_name="${slug}-${version}.zip"
+
+            echo "=========================================================="
+            echo "Building extension: $slug (version: $version, tag: $tag)"
+            echo "=========================================================="
+            flamegate-publisher build "$slug"
+
+            echo "Bundling extension: $slug"
+            flamegate-publisher bundle "$slug" "$version" --out "$zip_name"
+
+            echo "Creating/updating GitHub Release: $tag"
+            gh release create "$tag" "$zip_name" \
+              --repo "${{ github.repository }}" \
+              --title "$tag" \
+              --generate-notes \
+              --clobber || {
+                gh release upload "$tag" "$zip_name" --repo "${{ github.repository }}" --clobber
+              }
+
+            echo "Successfully released $slug ($tag)"
+          done
