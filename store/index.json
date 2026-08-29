@@ -25,6 +25,18 @@
         "tag_prefix": "xiaomi-mimo-v",
         "asset_pattern": "xiaomi-mimo-{version}.zip"
       }
+    },
+    {
+      "slug": "antigravity",
+      "name": "Antigravity",
+      "description": "Google Antigravity & CodeAssist provider extension (Rust) with Google OAuth2.",
+      "source": {
+        "type": "github",
+        "owner": "bobbyunknown",
+        "repo": "flamegate-ext",
+        "tag_prefix": "antigravity-v",
+        "asset_pattern": "antigravity-{version}.zip"
+      }
     }
   ]
 }

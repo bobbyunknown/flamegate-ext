@@ -15,6 +15,7 @@ on:
           - all
           - cline
           - xiaomi-mimo
+          - antigravity
       version:
         description: "Version override (leave empty to use version from schema.json)"
         required: false

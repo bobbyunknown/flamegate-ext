@@ -1,0 +1,13 @@
+{
+  "slug": "antigravity",
+  "name": "Antigravity",
+  "version": "0.1.0",
+  "description": "Google Antigravity & CodeAssist provider extension via WASM. Provides Gemini & Claude models with Google OAuth and v1internal integration.",
+  "entrypoints": {
+    "chat": "invoke",
+    "models": "list_models"
+  },
+  "auth_modes": ["oauth"],
+  "timeout": 120,
+  "default_account_key": "default"
+}
