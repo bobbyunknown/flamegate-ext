@@ -227,14 +227,14 @@ fn handle_oauth_exchange(payload: &str) -> u32 {
     let redirect_uri = extract_json_string(payload, "redirect_uri").unwrap_or_default();
 
     let form_body = format!(
-        "client_id={}&client_secret={}&code={}&redirect_uri={}&grant_type=authorization_code",
+        "grant_type=authorization_code&client_id={}&client_secret={}&code={}&redirect_uri={}",
         url_encode(&client_id()),
         url_encode(&client_secret()),
         url_encode(&code),
         url_encode(&redirect_uri)
     );
 
-    let hdrs = "Content-Type: application/x-www-form-urlencoded\r\n";
+    let hdrs = "{\"Content-Type\":\"application/x-www-form-urlencoded\",\"Accept\":\"application/json\"}";
     let (u_ptr, u_len) = str_to_ptr(OAUTH_TOKEN_URL);
     let (b_ptr, b_len) = str_to_ptr(&form_body);
     let (h_ptr, h_len) = str_to_ptr(hdrs);
@@ -255,7 +255,7 @@ fn handle_oauth_exchange(payload: &str) -> u32 {
 
     // Fetch user info for account identification
     let mut account_name = String::from("antigravity-user");
-    let user_hdrs = format!("Authorization: Bearer {}\r\n", access_token);
+    let user_hdrs = format!("{{\"Authorization\":\"Bearer {}\",\"Accept\":\"application/json\"}}", json_escape(&access_token));
     let (uu_ptr, uu_len) = str_to_ptr(USER_INFO_URL);
     let (uh_ptr, uh_len) = str_to_ptr(&user_hdrs);
     let user_resp_ptr = unsafe { http_get(uu_ptr, uu_len, uh_ptr, uh_len) };
@@ -271,10 +271,13 @@ fn handle_oauth_exchange(payload: &str) -> u32 {
 
     // Fetch project ID from CodeAssist loadCodeAssist
     let mut project_id = String::new();
-    let project_body = "{\"metadata\":{\"ideType\":\"ANTIGRAVITY\"}}";
+    let project_body = "{\"metadata\":{\"ideType\":9,\"platform\":1,\"pluginType\":2}}";
     let (lp_ptr, lp_len) = str_to_ptr(LOAD_PROJECT_URL);
     let (lpb_ptr, lpb_len) = str_to_ptr(project_body);
-    let lph_hdrs = format!("Authorization: Bearer {}\r\nContent-Type: application/json\r\nUser-Agent: antigravity/1.0.0\r\n", access_token);
+    let lph_hdrs = format!(
+        "{{\"Authorization\":\"Bearer {}\",\"Content-Type\":\"application/json\",\"User-Agent\":\"antigravity/ide/2.1.1 darwin/arm64\",\"X-Goog-Api-Client\":\"google-cloud-sdk vscode/2.1.1\",\"Client-Metadata\":\"{{\\\"ideType\\\":9,\\\"platform\\\":1,\\\"pluginType\\\":2}}\"}}",
+        json_escape(&access_token)
+    );
     let (lph_ptr, lph_len) = str_to_ptr(&lph_hdrs);
     let proj_resp_ptr = unsafe { http_post(lp_ptr, lp_len, lpb_ptr, lpb_len, lph_ptr, lph_len) };
     if proj_resp_ptr != 0 {
@@ -310,7 +313,7 @@ fn handle_oauth_refresh(payload: &str) -> u32 {
         url_encode(&refresh_token)
     );
 
-    let hdrs = "Content-Type: application/x-www-form-urlencoded\r\n";
+    let hdrs = "{\"Content-Type\":\"application/x-www-form-urlencoded\",\"Accept\":\"application/json\"}";
     let (u_ptr, u_len) = str_to_ptr(OAUTH_TOKEN_URL);
     let (b_ptr, b_len) = str_to_ptr(&form_body);
     let (h_ptr, h_len) = str_to_ptr(hdrs);
@@ -339,11 +342,11 @@ pub extern "C" fn list_models() -> u32 {
     let access_token = get_credential("access_token");
     if !access_token.is_empty() {
         let (u_ptr, u_len) = str_to_ptr(FETCH_MODELS_URL);
-        let body = "{\"metadata\":{\"ideType\":\"ANTIGRAVITY\"}}";
+        let body = "{\"metadata\":{\"ideType\":9,\"platform\":1,\"pluginType\":2}}";
         let (b_ptr, b_len) = str_to_ptr(body);
         let hdrs = format!(
-            "Authorization: Bearer {}\r\nContent-Type: application/json\r\nUser-Agent: antigravity/1.0.0\r\n",
-            access_token
+            "{{\"Authorization\":\"Bearer {}\",\"Content-Type\":\"application/json\",\"User-Agent\":\"antigravity/ide/2.1.1 darwin/arm64\",\"X-Goog-Api-Client\":\"google-cloud-sdk vscode/2.1.1\"}}",
+            json_escape(&access_token)
         );
         let (h_ptr, h_len) = str_to_ptr(&hdrs);
         let _ = unsafe { http_post(u_ptr, u_len, b_ptr, b_len, h_ptr, h_len) };
@@ -440,14 +443,14 @@ pub extern "C" fn invoke(ptr: u32, _len: u32) -> u32 {
     };
 
     let envelope = format!(
-        "{{{proj_field}\"model\":\"{}\",\"requestId\":\"agent/1724948000000/a1b2c3d4\",\"requestType\":\"agent\",\"enabledCreditTypes\":[\"GOOGLE_ONE_AI\"],\"userAgent\":\"antigravity/1.0.0\",\"request\":{}}}",
+        "{{{proj_field}\"model\":\"{}\",\"requestId\":\"agent/1724948000000/a1b2c3d4\",\"requestType\":\"agent\",\"enabledCreditTypes\":[\"GOOGLE_ONE_AI\"],\"userAgent\":\"antigravity/ide/2.1.1 darwin/arm64\",\"request\":{}}}",
         json_escape(&model),
         inner_req
     );
 
     let hdrs = format!(
-        "Authorization: Bearer {}\r\nContent-Type: application/json\r\nUser-Agent: antigravity/1.0.0\r\n",
-        access_token
+        "{{\"Authorization\":\"Bearer {}\",\"Content-Type\":\"application/json\",\"User-Agent\":\"antigravity/ide/2.1.1 darwin/arm64\",\"X-Goog-Api-Client\":\"google-cloud-sdk vscode/2.1.1\",\"Client-Metadata\":\"{{\\\"ideType\\\":9,\\\"platform\\\":1,\\\"pluginType\\\":2}}\"}}",
+        json_escape(&access_token)
     );
 
     if stream {
