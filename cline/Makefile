@@ -7,7 +7,7 @@ WASM_OUT = dist/cline.wasm
 
 build:
 	@mkdir -p dist
-	tinygo build -o $(WASM_OUT) -target=wasm-unknown -no-debug -panic=trap .
+	GOTOOLCHAIN=local tinygo build -o $(WASM_OUT) -target=wasm-unknown -no-debug -panic=trap .
 	@ls -lh $(WASM_OUT)
 
 clean:
