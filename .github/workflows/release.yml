@@ -110,8 +110,7 @@ jobs:
             gh release create "$tag" "$zip_name" \
               --repo "${{ github.repository }}" \
               --title "$tag" \
-              --generate-notes \
-              --clobber || {
+              --generate-notes || {
                 gh release upload "$tag" "$zip_name" --repo "${{ github.repository }}" --clobber
               }
 
