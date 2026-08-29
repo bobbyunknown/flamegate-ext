@@ -1,0 +1,59 @@
+name: Release extension
+
+on:
+  push:
+    tags:
+      - "*-v*" # e.g. xiaomi-mimo-v0.1.3
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Parse tag → slug + version
+        id: parse
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          SLUG="${TAG%-v*}"
+          VERSION="${TAG##*-v}"
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build extension WASM
+        working-directory: publisher
+        run: |
+          go build -o /usr/local/bin/flamegate-publisher .
+          flamegate-publisher build "${{ steps.parse.outputs.slug }}"
+
+      - name: "Bundle + sign (community: signs only when key set)"
+        working-directory: publisher
+        env:
+          FLAMEGATE_SIGNING_KEY: ${{ secrets.FLAMEGATE_SIGNING_KEY }}
+        run: |
+          flamegate-publisher bundle \
+            "${{ steps.parse.outputs.slug }}" \
+            "${{ steps.parse.outputs.version }}" \
+            --out "${{ steps.parse.outputs.slug }}-${{ steps.parse.outputs.version }}.zip"
+
+      - name: Create release and upload asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create \
+            "${{ steps.parse.outputs.tag }}" \
+            "${{ steps.parse.outputs.slug }}-${{ steps.parse.outputs.version }}.zip" \
+            --repo "${{ github.repository }}" \
+            --generate-notes

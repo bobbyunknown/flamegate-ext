@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "index_url": "https://raw.githubusercontent.com/bobbyunknown/flamegate-ext/main/store/index.json",
+  "extensions": [
+    {
+      "slug": "xiaomi-mimo",
+      "name": "Xiaomi MiMo",
+      "description": "Xiaomi MiMo AI integration (Rust) with pay-as-you-go API key auth.",
+      "source": {
+        "type": "github",
+        "owner": "bobbyunknown",
+        "repo": "flamegate-ext",
+        "tag_prefix": "xiaomi-mimo-v",
+        "asset_pattern": "xiaomi-mimo-{version}.zip"
+      }
+    }
+  ]
+}
