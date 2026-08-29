@@ -25,11 +25,10 @@ static mut WRITE_POS: u32 = 0;
 const OAUTH_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const OAUTH_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const USER_INFO_URL: &str = "https://www.googleapis.com/oauth2/v2/userinfo";
-const LOAD_PROJECT_URL: &str = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist";
-const FETCH_MODELS_URL: &str = "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels";
-const GENERATE_URL: &str = "https://cloudcode-pa.googleapis.com/v1internal:generateContent";
-const STREAM_GENERATE_URL: &str = "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse";
+const GENERATE_URL: &str = "https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent";
+const STREAM_GENERATE_URL: &str = "https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse";
 
+const ANTIGRAVITY_UA: &str = "antigravity/cli/1.1.22 (aidev_client; os_type=darwin; arch=amd64; cl=971564011; auth_method=consumer)";
 const OAUTH_SCOPES: &str = "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/cclog https://www.googleapis.com/auth/experimentsandconfigs https://www.googleapis.com/auth/aicode";
 
 fn decode_xor(bytes: &[u8], key: u8) -> String {
@@ -153,16 +152,71 @@ fn get_credential(key: &str) -> String {
 }
 
 fn extract_json_string(json: &str, key: &str) -> Option<String> {
-    let pattern = format!("\"{}\":\"", key);
-    let start = json.find(&pattern)? + pattern.len();
-    let end = json[start..].find('"')?;
-    Some(json[start..start + end].to_string())
+    let key_pattern = format!("\"{}\"", key);
+    let key_pos = json.find(&key_pattern)?;
+    let after_key = &json[key_pos + key_pattern.len()..];
+    let colon_pos = after_key.find(':')?;
+    let after_colon = after_key[colon_pos + 1..].trim_start();
+    if after_colon.starts_with('"') {
+        let after_quote = &after_colon[1..];
+        let mut end = 0;
+        let mut escaped = false;
+        for (i, c) in after_quote.char_indices() {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == '"' {
+                end = i;
+                break;
+            }
+        }
+        Some(after_quote[..end].to_string())
+    } else {
+        None
+    }
+}
+
+fn extract_candidate_text(json: &str) -> String {
+    let mut text_acc = String::new();
+    let search_key = "\"text\"";
+    let mut offset = 0;
+    while let Some(pos) = json[offset..].find(search_key) {
+        let abs_pos = offset + pos;
+        let after_key = &json[abs_pos + search_key.len()..];
+        if let Some(colon_pos) = after_key.find(':') {
+            let after_colon = after_key[colon_pos + 1..].trim_start();
+            if after_colon.starts_with('"') {
+                let after_quote = &after_colon[1..];
+                let mut end = 0;
+                let mut escaped = false;
+                for (i, c) in after_quote.char_indices() {
+                    if escaped {
+                        escaped = false;
+                    } else if c == '\\' {
+                        escaped = true;
+                    } else if c == '"' {
+                        end = i;
+                        break;
+                    }
+                }
+                let part_text = &after_quote[..end];
+                text_acc.push_str(part_text);
+                offset = abs_pos + search_key.len() + 1 + colon_pos + 1 + end + 1;
+                continue;
+            }
+        }
+        offset = abs_pos + search_key.len();
+    }
+    text_acc
 }
 
 fn extract_json_bool(json: &str, key: &str) -> Option<bool> {
-    let pattern = format!("\"{}\":", key);
-    let start = json.find(&pattern)? + pattern.len();
-    let rest = json[start..].trim_start();
+    let key_pattern = format!("\"{}\"", key);
+    let key_pos = json.find(&key_pattern)?;
+    let after_key = &json[key_pos + key_pattern.len()..];
+    let colon_pos = after_key.find(':')?;
+    let rest = after_key[colon_pos + 1..].trim_start();
     if rest.starts_with("true") {
         Some(true)
     } else if rest.starts_with("false") {
@@ -241,7 +295,7 @@ fn handle_oauth_exchange(payload: &str) -> u32 {
 
     let token_resp_ptr = unsafe { http_post(u_ptr, u_len, b_ptr, b_len, h_ptr, h_len) };
     if token_resp_ptr == 0 {
-        return write_json("{\"error\":\"failed to exchange token from Google OAuth\"}");
+        return write_json("{\"error\":\"failed to exchange token from Google OAuth: http_post returned null\"}");
     }
 
     let token_raw = read_host_json(token_resp_ptr);
@@ -269,32 +323,12 @@ fn handle_oauth_exchange(payload: &str) -> u32 {
         }
     }
 
-    // Fetch project ID from CodeAssist loadCodeAssist
-    let mut project_id = String::new();
-    let project_body = "{\"metadata\":{\"ideType\":9,\"platform\":1,\"pluginType\":2}}";
-    let (lp_ptr, lp_len) = str_to_ptr(LOAD_PROJECT_URL);
-    let (lpb_ptr, lpb_len) = str_to_ptr(project_body);
-    let lph_hdrs = format!(
-        "{{\"Authorization\":\"Bearer {}\",\"Content-Type\":\"application/json\",\"User-Agent\":\"antigravity/ide/2.1.1 darwin/arm64\",\"X-Goog-Api-Client\":\"google-cloud-sdk vscode/2.1.1\",\"Client-Metadata\":\"{{\\\"ideType\\\":9,\\\"platform\\\":1,\\\"pluginType\\\":2}}\"}}",
-        json_escape(&access_token)
-    );
-    let (lph_ptr, lph_len) = str_to_ptr(&lph_hdrs);
-    let proj_resp_ptr = unsafe { http_post(lp_ptr, lp_len, lpb_ptr, lpb_len, lph_ptr, lph_len) };
-    if proj_resp_ptr != 0 {
-        let proj_raw = read_host_json(proj_resp_ptr);
-        let proj_json = core::str::from_utf8(proj_raw).unwrap_or("");
-        if let Some(pid) = extract_json_string(proj_json, "cloudaicompanionProject") {
-            project_id = pid;
-        }
-    }
-
     let result = format!(
-        "{{\"access_token\":\"{}\",\"refresh_token\":\"{}\",\"expires_in\":3599,\"email\":\"{}\",\"account_name\":\"{}\",\"project_id\":\"{}\"}}",
+        "{{\"access_token\":\"{}\",\"refresh_token\":\"{}\",\"expires_in\":3599,\"email\":\"{}\",\"account_name\":\"{}\",\"project_id\":\"aicode-consumers\"}}",
         json_escape(&access_token),
         json_escape(&refresh_token),
         json_escape(&account_name),
-        json_escape(&account_name),
-        json_escape(&project_id)
+        json_escape(&account_name)
     );
     write_json(&result)
 }
@@ -320,7 +354,7 @@ fn handle_oauth_refresh(payload: &str) -> u32 {
 
     let token_resp_ptr = unsafe { http_post(u_ptr, u_len, b_ptr, b_len, h_ptr, h_len) };
     if token_resp_ptr == 0 {
-        return write_json("{\"error\":\"failed to refresh token from Google OAuth\"}");
+        return write_json("{\"error\":\"failed to refresh token from Google OAuth: http_post returned null\"}");
     }
 
     let token_raw = read_host_json(token_resp_ptr);
@@ -339,20 +373,26 @@ fn handle_oauth_refresh(payload: &str) -> u32 {
 #[no_mangle]
 pub extern "C" fn list_models() -> u32 {
     reset_mem();
-    let access_token = get_credential("access_token");
-    if !access_token.is_empty() {
-        let (u_ptr, u_len) = str_to_ptr(FETCH_MODELS_URL);
-        let body = "{\"metadata\":{\"ideType\":9,\"platform\":1,\"pluginType\":2}}";
-        let (b_ptr, b_len) = str_to_ptr(body);
-        let hdrs = format!(
-            "{{\"Authorization\":\"Bearer {}\",\"Content-Type\":\"application/json\",\"User-Agent\":\"antigravity/ide/2.1.1 darwin/arm64\",\"X-Goog-Api-Client\":\"google-cloud-sdk vscode/2.1.1\"}}",
-            json_escape(&access_token)
-        );
-        let (h_ptr, h_len) = str_to_ptr(&hdrs);
-        let _ = unsafe { http_post(u_ptr, u_len, b_ptr, b_len, h_ptr, h_len) };
-    }
-
-    let models_json = r#"[{"id":"gemini-2.5-pro","name":"Gemini 2.5 Pro"},{"id":"gemini-2.5-flash","name":"Gemini 2.5 Flash"},{"id":"gemini-2.0-flash","name":"Gemini 2.0 Flash"},{"id":"gemini-2.0-pro-exp-02-05","name":"Gemini 2.0 Pro Exp"},{"id":"claude-3-5-sonnet","name":"Claude 3.5 Sonnet"},{"id":"claude-3-7-sonnet","name":"Claude 3.7 Sonnet"}]"#;
+    let models_json = r#"[
+        {"id":"gemini-3.7-flash-high","name":"Gemini 3.7 Flash (High)","tier":"flash","tags":["flash","agent"]},
+        {"id":"gemini-3.7-flash-medium","name":"Gemini 3.7 Flash (Medium)","tier":"flash","tags":["flash"]},
+        {"id":"gemini-3.7-flash-low","name":"Gemini 3.7 Flash (Low)","tier":"flash","tags":["flash"]},
+        {"id":"gemini-3.6-flash-high","name":"Gemini 3.6 Flash (High)","tier":"flash","tags":["flash"]},
+        {"id":"gemini-3.6-flash-medium","name":"Gemini 3.6 Flash (Medium)","tier":"flash","tags":["flash"]},
+        {"id":"gemini-3.6-flash-low","name":"Gemini 3.6 Flash (Low)","tier":"flash","tags":["flash"]},
+        {"id":"gemini-3-flash-agent","name":"Gemini 3.5 Flash (High)","tier":"flash","tags":["flash","agent"]},
+        {"id":"gemini-3.5-flash-low","name":"Gemini 3.5 Flash (Medium)","tier":"flash","tags":["flash"]},
+        {"id":"gemini-3.5-flash-extra-low","name":"Gemini 3.5 Flash (Low)","tier":"flash","tags":["flash"]},
+        {"id":"gemini-pro-agent","name":"Gemini 3.1 Pro (High)","tier":"pro","tags":["pro","agent"]},
+        {"id":"gemini-3.1-pro-low","name":"Gemini 3.1 Pro (Low)","tier":"pro","tags":["pro"]},
+        {"id":"claude-sonnet-4-6","name":"Claude Sonnet 4.6 (Thinking)","tier":"frontier","tags":["frontier","thinking"]},
+        {"id":"claude-opus-4-6-thinking","name":"Claude Opus 4.6 (Thinking)","tier":"frontier","tags":["frontier","thinking"]},
+        {"id":"gpt-oss-120b-medium","name":"GPT-OSS 120B (Medium)","tier":"free","tags":["free","open-source"]},
+        {"id":"gemini-3-flash","name":"Gemini 3 Flash","tier":"flash","tags":["flash"]},
+        {"id":"gemini-3.1-flash-image","name":"Gemini 3.1 Flash (Image)","tier":"image","tags":["image"]},
+        {"id":"gemini-2.5-flash","name":"Gemini 2.5 Flash","tier":"flash","tags":["flash"]},
+        {"id":"gemini-2.5-pro","name":"Gemini 2.5 Pro","tier":"pro","tags":["pro"]}
+    ]"#;
     write_json(models_json)
 }
 
@@ -372,7 +412,6 @@ pub extern "C" fn invoke(ptr: u32, _len: u32) -> u32 {
     }
 
     let access_token = get_credential("access_token");
-    let project_id = get_credential("project_id");
     let model = extract_json_string(req_json, "model").unwrap_or_else(|| "gemini-2.5-flash".to_string());
     let stream = extract_json_bool(req_json, "stream").unwrap_or(false);
 
@@ -398,7 +437,6 @@ pub extern "C" fn invoke(ptr: u32, _len: u32) -> u32 {
                     user_text.push_str(&content);
                 }
             } else if let Some(text_val) = extract_json_string(sub, "text") {
-                // FlameGate domain ContentPart format
                 if role == "system" {
                     if !system_text.is_empty() {
                         system_text.push('\n');
@@ -436,21 +474,16 @@ pub extern "C" fn invoke(ptr: u32, _len: u32) -> u32 {
         sys_instruction
     );
 
-    let proj_field = if !project_id.is_empty() {
-        format!("\"project\":\"{}\",", json_escape(&project_id))
-    } else {
-        String::new()
-    };
-
     let envelope = format!(
-        "{{{proj_field}\"model\":\"{}\",\"requestId\":\"agent/1724948000000/a1b2c3d4\",\"requestType\":\"agent\",\"enabledCreditTypes\":[\"GOOGLE_ONE_AI\"],\"userAgent\":\"antigravity/ide/2.1.1 darwin/arm64\",\"request\":{}}}",
+        "{{\"project\":\"aicode-consumers\",\"model\":\"{}\",\"userAgent\":\"antigravity\",\"requestType\":\"agent\",\"requestId\":\"agent/00000000-0000-0000-0000-000000000000/1724948000000/00000000-0000-0000-0000-000000000000/1\",\"request\":{}}}",
         json_escape(&model),
         inner_req
     );
 
     let hdrs = format!(
-        "{{\"Authorization\":\"Bearer {}\",\"Content-Type\":\"application/json\",\"User-Agent\":\"antigravity/ide/2.1.1 darwin/arm64\",\"X-Goog-Api-Client\":\"google-cloud-sdk vscode/2.1.1\",\"Client-Metadata\":\"{{\\\"ideType\\\":9,\\\"platform\\\":1,\\\"pluginType\\\":2}}\"}}",
-        json_escape(&access_token)
+        "{{\"Authorization\":\"Bearer {}\",\"Content-Type\":\"application/json\",\"User-Agent\":\"{}\"}}",
+        json_escape(&access_token),
+        json_escape(ANTIGRAVITY_UA)
     );
 
     if stream {
@@ -465,12 +498,13 @@ pub extern "C" fn invoke(ptr: u32, _len: u32) -> u32 {
 
             for line in resp_str.lines() {
                 let trimmed = line.trim();
-                if trimmed.starts_with("data:") {
-                    let chunk_payload = trimmed[5..].trim();
-                    if chunk_payload == "[DONE]" {
+                if let Some(data_str) = trimmed.strip_prefix("data:") {
+                    let payload = data_str.trim();
+                    if payload == "[DONE]" || payload.is_empty() {
                         continue;
                     }
-                    if let Some(text) = extract_json_string(chunk_payload, "text") {
+                    let text = extract_candidate_text(payload);
+                    if !text.is_empty() {
                         let chunk = format!(
                             "{{\"choices\":[{{\"delta\":{{\"content\":\"{}\"}},\"index\":0}}]}}",
                             json_escape(&text)
@@ -493,9 +527,10 @@ pub extern "C" fn invoke(ptr: u32, _len: u32) -> u32 {
         if resp_ptr != 0 {
             let resp_raw = read_host_json(resp_ptr);
             let resp_str = core::str::from_utf8(resp_raw).unwrap_or("");
-            if let Some(text) = extract_json_string(resp_str, "text") {
-                reply_text = text;
+            if resp_str.contains("\"error\"") {
+                return write_json(resp_str);
             }
+            reply_text = extract_candidate_text(resp_str);
         }
 
         let resp = format!(
