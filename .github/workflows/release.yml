@@ -82,7 +82,8 @@ jobs:
               t="${s}-v${v}"
               ITEMS=$(echo "$ITEMS" | jq --arg s "$s" --arg v "$v" --arg t "$t" '. + [{"slug": $s, "version": $v, "tag": $t}]')
             done
-            echo "items=$ITEMS" >> "$GITHUB_OUTPUT"
+            COMPACT=$(echo "$ITEMS" | jq -c .)
+            echo "items=$COMPACT" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build, bundle, and release extensions
