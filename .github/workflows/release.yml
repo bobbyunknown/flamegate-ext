@@ -21,6 +21,16 @@ jobs:
         with:
           go-version: "1.24"
 
+      - name: Setup TinyGo (for Go/TinyGo WASM extensions)
+        uses: tinygo-org/setup-tinygo@v2
+        with:
+          tinygo-version: "0.40.1"
+
+      - name: Setup Rust & wasm32 target (for Rust WASM extensions)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
       - name: Parse tag → slug + version
         id: parse
         shell: bash
@@ -32,14 +42,15 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Build extension WASM
-        working-directory: publisher
+      - name: Build publisher CLI tool
         run: |
-          go build -o /usr/local/bin/flamegate-publisher .
+          go build -C publisher -o /usr/local/bin/flamegate-publisher .
+
+      - name: Build extension WASM
+        run: |
           flamegate-publisher build "${{ steps.parse.outputs.slug }}"
 
       - name: "Bundle + sign (community: signs only when key set)"
-        working-directory: publisher
         env:
           FLAMEGATE_SIGNING_KEY: ${{ secrets.FLAMEGATE_SIGNING_KEY }}
         run: |

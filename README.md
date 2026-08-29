@@ -6,14 +6,6 @@ Extensions allow FlameGate to interface with specialized LLM providers, custom A
 
 ---
 
-## 📦 Available Extensions
-
-| Extension | Language | Description | Auth Mode |
-|---|---|---|---|
-| [`xiaomi-mimo`](./xiaomi-mimo/) | Rust | Xiaomi MiMo AI integration | API Key |
-
----
-
 ## 🚀 Quick Start
 
 ### Prerequisites

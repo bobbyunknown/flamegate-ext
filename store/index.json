@@ -3,6 +3,18 @@
   "index_url": "https://raw.githubusercontent.com/bobbyunknown/flamegate-ext/main/store/index.json",
   "extensions": [
     {
+      "slug": "cline",
+      "name": "Cline",
+      "description": "Cline extension via WASM (TinyGo) with WorkOS OAuth2 support.",
+      "source": {
+        "type": "github",
+        "owner": "bobbyunknown",
+        "repo": "flamegate-ext",
+        "tag_prefix": "cline-v",
+        "asset_pattern": "cline-{version}.zip"
+      }
+    },
+    {
       "slug": "xiaomi-mimo",
       "name": "Xiaomi MiMo",
       "description": "Xiaomi MiMo AI integration (Rust) with pay-as-you-go API key auth.",
