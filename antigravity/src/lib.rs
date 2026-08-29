@@ -217,7 +217,7 @@ fn handle_oauth_authorize(payload: &str) -> u32 {
         url_encode(&state)
     );
 
-    let resp = format!("{{\"url\":\"{}\"}}", json_escape(&auth_url));
+    let resp = format!("{{\"url\":\"{}\",\"state\":\"{}\"}}", json_escape(&auth_url), json_escape(&state));
     write_json(&resp)
 }
 
@@ -286,9 +286,10 @@ fn handle_oauth_exchange(payload: &str) -> u32 {
     }
 
     let result = format!(
-        "{{\"access_token\":\"{}\",\"refresh_token\":\"{}\",\"expires_in\":3599,\"account_name\":\"{}\",\"project_id\":\"{}\"}}",
+        "{{\"access_token\":\"{}\",\"refresh_token\":\"{}\",\"expires_in\":3599,\"email\":\"{}\",\"account_name\":\"{}\",\"project_id\":\"{}\"}}",
         json_escape(&access_token),
         json_escape(&refresh_token),
+        json_escape(&account_name),
         json_escape(&account_name),
         json_escape(&project_id)
     );
@@ -348,12 +349,12 @@ pub extern "C" fn list_models() -> u32 {
         let _ = unsafe { http_post(u_ptr, u_len, b_ptr, b_len, h_ptr, h_len) };
     }
 
-    let models_json = r#"{"object":"list","data":[{"id":"gemini-2.5-pro","object":"model","owned_by":"antigravity"},{"id":"gemini-2.5-flash","object":"model","owned_by":"antigravity"},{"id":"gemini-2.0-flash","object":"model","owned_by":"antigravity"},{"id":"gemini-2.0-pro-exp-02-05","object":"model","owned_by":"antigravity"},{"id":"claude-3-5-sonnet","object":"model","owned_by":"antigravity"},{"id":"claude-3-7-sonnet","object":"model","owned_by":"antigravity"}]}"#;
+    let models_json = r#"[{"id":"gemini-2.5-pro","name":"Gemini 2.5 Pro"},{"id":"gemini-2.5-flash","name":"Gemini 2.5 Flash"},{"id":"gemini-2.0-flash","name":"Gemini 2.0 Flash"},{"id":"gemini-2.0-pro-exp-02-05","name":"Gemini 2.0 Pro Exp"},{"id":"claude-3-5-sonnet","name":"Claude 3.5 Sonnet"},{"id":"claude-3-7-sonnet","name":"Claude 3.7 Sonnet"}]"#;
     write_json(models_json)
 }
 
 #[no_mangle]
-pub extern "C" fn invoke(ptr: u32) -> u32 {
+pub extern "C" fn invoke(ptr: u32, _len: u32) -> u32 {
     let req_raw = read_host_json(ptr);
     let req_json = core::str::from_utf8(req_raw).unwrap_or("");
 
@@ -393,13 +394,30 @@ pub extern "C" fn invoke(ptr: u32) -> u32 {
                     }
                     user_text.push_str(&content);
                 }
+            } else if let Some(text_val) = extract_json_string(sub, "text") {
+                // FlameGate domain ContentPart format
+                if role == "system" {
+                    if !system_text.is_empty() {
+                        system_text.push('\n');
+                    }
+                    system_text.push_str(&text_val);
+                } else if role == "user" || role == "assistant" {
+                    if !user_text.is_empty() {
+                        user_text.push('\n');
+                    }
+                    user_text.push_str(&text_val);
+                }
             }
         }
         search_idx = abs_pos + 8;
     }
 
     if user_text.is_empty() {
-        user_text = "Hello".to_string();
+        if let Some(prompt) = extract_json_string(req_json, "text") {
+            user_text = prompt;
+        } else {
+            user_text = "Hello".to_string();
+        }
     }
 
     // Build internal v1internal envelope
@@ -450,18 +468,18 @@ pub extern "C" fn invoke(ptr: u32) -> u32 {
                         continue;
                     }
                     if let Some(text) = extract_json_string(chunk_payload, "text") {
-                        let sse_chunk = format!(
-                            "data: {{\"id\":\"chatcmpl-ag\",\"object\":\"chat.completion.chunk\",\"model\":\"{}\",\"choices\":[{{\"index\":0,\"delta\":{{\"content\":\"{}\"}},\"finish_reason\":null}}]}}\n\n",
-                            json_escape(&model),
+                        let chunk = format!(
+                            "{{\"choices\":[{{\"delta\":{{\"content\":\"{}\"}},\"index\":0}}]}}",
                             json_escape(&text)
                         );
-                        emit(sse_chunk.as_bytes());
+                        emit(chunk.as_bytes());
                     }
                 }
             }
         }
-        emit(b"data: [DONE]\n\n");
-        return write_json("{}");
+        let finish_chunk = "{\"choices\":[{\"delta\":{\"content\":\"\"},\"index\":0,\"finish_reason\":\"stop\"}]}";
+        emit(finish_chunk.as_bytes());
+        return 0;
     } else {
         let (u_ptr, u_len) = str_to_ptr(GENERATE_URL);
         let (b_ptr, b_len) = str_to_ptr(&envelope);
@@ -478,8 +496,7 @@ pub extern "C" fn invoke(ptr: u32) -> u32 {
         }
 
         let resp = format!(
-            "{{\"id\":\"chatcmpl-ag\",\"object\":\"chat.completion\",\"created\":1724948000,\"model\":\"{}\",\"choices\":[{{\"index\":0,\"message\":{{\"role\":\"assistant\",\"content\":\"{}\"}},\"finish_reason\":\"stop\"}}],\"usage\":{{\"prompt_tokens\":10,\"completion_tokens\":20,\"total_tokens\":30}}}}",
-            json_escape(&model),
+            "{{\"content\":\"{}\",\"finish_reason\":\"stop\"}}",
             json_escape(&reply_text)
         );
         return write_json(&resp);
