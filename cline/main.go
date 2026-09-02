@@ -871,39 +871,39 @@ func jsonEscape(s string) string {
 
 //export list_models
 func list_models() uint32 {
-	// Offline curated catalog (server-authored recommendations, free bucket, and cline-pass)
+	// Offline curated catalog declaring explicit tiers and tags for reference
 	const raw = `[` +
-		`{"id":"moonshotai/kimi-k3","name":"Kimi K3 (Frontier)"},` +
-		`{"id":"anthropic/claude-opus-5","name":"Claude Opus 5 (Frontier)"},` +
-		`{"id":"x-ai/grok-4.5","name":"Grok 4.5 (Frontier)"},` +
-		`{"id":"openai/gpt-5.6-sol","name":"GPT-5.6 Sol (Frontier)"},` +
-		`{"id":"zai/glm-5.2","name":"GLM 5.2"},` +
-		`{"id":"z-ai/glm-5.3-flash","name":"GLM 5.3 Flash (Free)"},` +
-		`{"id":"deepseek/deepseek-v4-flash","name":"DeepSeek V4 Flash (Free)"},` +
-		`{"id":"poolside/laguna-s-2.1:free","name":"Laguna S 2.1 (Free)"},` +
-		`{"id":"openrouter/free","name":"Free Models Router"},` +
-		`{"id":"tencent/hy3:free","name":"Tencent Hy3 (Free)"},` +
-		`{"id":"stepfun/step-3.7-flash","name":"Step 3.7 Flash (Free)"},` +
-		`{"id":"poolside/laguna-m.1:free","name":"Laguna M.1 (Free)"},` +
-		`{"id":"google/gemma-4-31b-it:free","name":"Gemma 4 31B (Free)"},` +
-		`{"id":"nvidia/nemotron-3-ultra-550b-a55b:free","name":"Nemotron 3 Ultra (Free)"},` +
-		`{"id":"minimax/minimax-m3","name":"MiniMax M3 (Free)"},` +
-		`{"id":"cline-pass/qwen3.8-max","name":"Qwen 3.8 Max (ClinePass)"},` +
-		`{"id":"cline-pass/qwen3.7-max","name":"Qwen 3.7 Max (ClinePass)"},` +
-		`{"id":"cline-pass/qwen3.7-plus","name":"Qwen 3.7 Plus (ClinePass)"},` +
-		`{"id":"cline-pass/deepseek-v4-pro","name":"DeepSeek V4 Pro (ClinePass)"},` +
-		`{"id":"cline-pass/deepseek-v4-flash","name":"DeepSeek V4 Flash (ClinePass)"},` +
-		`{"id":"cline-pass/kimi-k3","name":"Kimi K3 (ClinePass)"},` +
-		`{"id":"cline-pass/kimi-k2.7-code","name":"Kimi K2.7 Code (ClinePass)"},` +
-		`{"id":"cline-pass/kimi-k2.6","name":"Kimi K2.6 (ClinePass)"},` +
-		`{"id":"cline-pass/glm-5.3","name":"GLM 5.3 (ClinePass)"},` +
-		`{"id":"cline-pass/glm-5.2","name":"GLM 5.2 (ClinePass)"},` +
-		`{"id":"cline-pass/minimax-m3","name":"MiniMax M3 (ClinePass)"},` +
-		`{"id":"cline-pass/mimo-v2.5-pro","name":"MiMo V2.5 Pro (ClinePass)"},` +
-		`{"id":"cline-pass/mimo-v2.5","name":"MiMo V2.5 (ClinePass)"},` +
-		`{"id":"cline-cloud/kimi-k3","name":"Kimi K3 (Cloud)"},` +
-		`{"id":"cline-cloud/deepseek-v4-flash","name":"DeepSeek V4 Flash (Cloud)"},` +
-		`{"id":"cline-cloud/glm-5.2","name":"GLM 5.2 (Cloud)"}` +
+		`{"id":"moonshotai/kimi-k3","name":"Kimi K3 (Frontier)","tier":"frontier","tags":["frontier","chat"]},` +
+		`{"id":"anthropic/claude-opus-5","name":"Claude Opus 5 (Frontier)","tier":"frontier","tags":["frontier","thinking"]},` +
+		`{"id":"x-ai/grok-4.5","name":"Grok 4.5 (Frontier)","tier":"frontier","tags":["frontier"]},` +
+		`{"id":"openai/gpt-5.6-sol","name":"GPT-5.6 Sol (Frontier)","tier":"frontier","tags":["frontier"]},` +
+		`{"id":"zai/glm-5.2","name":"GLM 5.2","tier":"pro","tags":["pro"]},` +
+		`{"id":"z-ai/glm-5.3-flash","name":"GLM 5.3 Flash (Free)","tier":"free","tags":["free","flash"]},` +
+		`{"id":"deepseek/deepseek-v4-flash","name":"DeepSeek V4 Flash (Free)","tier":"free","tags":["free","flash"]},` +
+		`{"id":"poolside/laguna-s-2.1:free","name":"Laguna S 2.1 (Free)","tier":"free","tags":["free","code"]},` +
+		`{"id":"openrouter/free","name":"Free Models Router","tier":"free","tags":["free","router"]},` +
+		`{"id":"tencent/hy3:free","name":"Tencent Hy3 (Free)","tier":"free","tags":["free"]},` +
+		`{"id":"stepfun/step-3.7-flash","name":"Step 3.7 Flash (Free)","tier":"free","tags":["free","flash"]},` +
+		`{"id":"poolside/laguna-m.1:free","name":"Laguna M.1 (Free)","tier":"free","tags":["free","code"]},` +
+		`{"id":"google/gemma-4-31b-it:free","name":"Gemma 4 31B (Free)","tier":"free","tags":["free"]},` +
+		`{"id":"nvidia/nemotron-3-ultra-550b-a55b:free","name":"Nemotron 3 Ultra (Free)","tier":"free","tags":["free"]},` +
+		`{"id":"minimax/minimax-m3","name":"MiniMax M3 (Free)","tier":"free","tags":["free"]},` +
+		`{"id":"cline-pass/qwen3.8-max","name":"Qwen 3.8 Max (ClinePass)","tier":"pass","tags":["pass","code"]},` +
+		`{"id":"cline-pass/qwen3.7-max","name":"Qwen 3.7 Max (ClinePass)","tier":"pass","tags":["pass","code"]},` +
+		`{"id":"cline-pass/qwen3.7-plus","name":"Qwen 3.7 Plus (ClinePass)","tier":"pass","tags":["pass","code"]},` +
+		`{"id":"cline-pass/deepseek-v4-pro","name":"DeepSeek V4 Pro (ClinePass)","tier":"pass","tags":["pass","pro"]},` +
+		`{"id":"cline-pass/deepseek-v4-flash","name":"DeepSeek V4 Flash (ClinePass)","tier":"pass","tags":["pass","flash"]},` +
+		`{"id":"cline-pass/kimi-k3","name":"Kimi K3 (ClinePass)","tier":"pass","tags":["pass","frontier"]},` +
+		`{"id":"cline-pass/kimi-k2.7-code","name":"Kimi K2.7 Code (ClinePass)","tier":"pass","tags":["pass","code"]},` +
+		`{"id":"cline-pass/kimi-k2.6","name":"Kimi K2.6 (ClinePass)","tier":"pass","tags":["pass","code"]},` +
+		`{"id":"cline-pass/glm-5.3","name":"GLM 5.3 (ClinePass)","tier":"pass","tags":["pass"]},` +
+		`{"id":"cline-pass/glm-5.2","name":"GLM 5.2 (ClinePass)","tier":"pass","tags":["pass"]},` +
+		`{"id":"cline-pass/minimax-m3","name":"MiniMax M3 (ClinePass)","tier":"pass","tags":["pass"]},` +
+		`{"id":"cline-pass/mimo-v2.5-pro","name":"MiMo V2.5 Pro (ClinePass)","tier":"pass","tags":["pass","pro"]},` +
+		`{"id":"cline-pass/mimo-v2.5","name":"MiMo V2.5 (ClinePass)","tier":"pass","tags":["pass"]},` +
+		`{"id":"cline-cloud/kimi-k3","name":"Kimi K3 (Cloud)","tier":"pro","tags":["pro","cloud"]},` +
+		`{"id":"cline-cloud/deepseek-v4-flash","name":"DeepSeek V4 Flash (Cloud)","tier":"flash","tags":["flash","cloud"]},` +
+		`{"id":"cline-cloud/glm-5.2","name":"GLM 5.2 (Cloud)","tier":"pro","tags":["pro","cloud"]}` +
 		`]`
 	return writeJSON(raw)
 }
