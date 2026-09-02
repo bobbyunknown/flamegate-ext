@@ -1,5 +1,7 @@
 {
   "slug": "antigravity",
+  "alias": "agy",
+  "aliases": ["agy", "antigravity"],
   "name": "Antigravity",
   "version": "0.1.0",
   "description": "Google Antigravity & CodeAssist provider extension via WASM. Provides Gemini & Claude models with Google OAuth and v1internal integration.",

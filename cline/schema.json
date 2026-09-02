@@ -1,5 +1,7 @@
 {
   "slug": "cline",
+  "alias": "cl",
+  "aliases": ["cl", "cline"],
   "name": "Cline",
   "version": "0.1.0",
   "description": "Cline extension via WASM. Uses Cline's OpenAI-compatible chat completions API with WorkOS OAuth.",

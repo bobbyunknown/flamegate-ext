@@ -1,5 +1,7 @@
 {
   "slug": "xiaomi-mimo",
+  "alias": "mimo",
+  "aliases": ["mimo", "xm", "xiaomi-mimo"],
   "name": "Xiaomi MiMo",
   "version": "0.1.0",
   "description": "Xiaomi MiMo extension via WASM (Rust). Pay-as-you-go API key auth.",
