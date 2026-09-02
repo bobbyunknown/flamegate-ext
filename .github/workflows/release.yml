@@ -68,7 +68,7 @@ jobs:
             VERSION_INPUT="${{ inputs.version }}"
 
             if [ "$SELECTED" = "all" ]; then
-              SLUGS="cline xiaomi-mimo"
+              SLUGS="cline xiaomi-mimo antigravity"
             else
               SLUGS="$SELECTED"
             fi
