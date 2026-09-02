@@ -211,6 +211,23 @@ fn extract_candidate_text(json: &str) -> String {
     text_acc
 }
 
+fn extract_google_error(json_str: &str) -> Option<String> {
+    if !json_str.contains("\"error\"") {
+        return None;
+    }
+    if let Some(msg) = extract_json_string(json_str, "message") {
+        if !msg.is_empty() {
+            return Some(msg);
+        }
+    }
+    if let Some(err_str) = extract_json_string(json_str, "error") {
+        if !err_str.is_empty() {
+            return Some(err_str);
+        }
+    }
+    Some("Google Cloud CodeAssist returned an error".to_string())
+}
+
 fn extract_json_bool(json: &str, key: &str) -> Option<bool> {
     let key_pattern = format!("\"{}\"", key);
     let key_pos = json.find(&key_pattern)?;
@@ -496,6 +513,14 @@ pub extern "C" fn invoke(ptr: u32, _len: u32) -> u32 {
             let resp_raw = read_host_json(resp_ptr);
             let resp_str = core::str::from_utf8(resp_raw).unwrap_or("");
 
+            if let Some(err_msg) = extract_google_error(resp_str) {
+                let err_resp = format!(
+                    "{{\"error\":\"Google Antigravity upstream error: {}\",\"code\":\"UPSTREAM_ERROR\"}}",
+                    json_escape(&err_msg)
+                );
+                return write_json(&err_resp);
+            }
+
             for line in resp_str.lines() {
                 let trimmed = line.trim();
                 if let Some(data_str) = trimmed.strip_prefix("data:") {
@@ -523,16 +548,21 @@ pub extern "C" fn invoke(ptr: u32, _len: u32) -> u32 {
         let (h_ptr, h_len) = str_to_ptr(&hdrs);
 
         let resp_ptr = unsafe { http_post(u_ptr, u_len, b_ptr, b_len, h_ptr, h_len) };
-        let mut reply_text = String::new();
-        if resp_ptr != 0 {
-            let resp_raw = read_host_json(resp_ptr);
-            let resp_str = core::str::from_utf8(resp_raw).unwrap_or("");
-            if resp_str.contains("\"error\"") {
-                return write_json(resp_str);
-            }
-            reply_text = extract_candidate_text(resp_str);
+        if resp_ptr == 0 {
+            return write_json("{\"error\":\"http_post failed: no response from host\",\"code\":\"HOST_HTTP_ERROR\"}");
         }
 
+        let resp_raw = read_host_json(resp_ptr);
+        let resp_str = core::str::from_utf8(resp_raw).unwrap_or("");
+        if let Some(err_msg) = extract_google_error(resp_str) {
+            let err_resp = format!(
+                "{{\"error\":\"Google Antigravity upstream error: {}\",\"code\":\"UPSTREAM_ERROR\"}}",
+                json_escape(&err_msg)
+            );
+            return write_json(&err_resp);
+        }
+
+        let reply_text = extract_candidate_text(resp_str);
         let resp = format!(
             "{{\"content\":\"{}\",\"finish_reason\":\"stop\"}}",
             json_escape(&reply_text)

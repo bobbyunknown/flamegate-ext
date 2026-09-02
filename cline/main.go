@@ -707,7 +707,7 @@ func oauthRefresh(reqBytes []byte) uint32 {
 	if refreshToken == "" {
 		return writeJSON(`{"error":"no refresh_token","code":"BAD_REQUEST"}`)
 	}
-	body := `{"grant_type":"refresh_token","refresh_token":"` + jsonEscape(refreshToken) + `","client_type":"extension"}`
+	body := `{"refreshToken":"` + jsonEscape(refreshToken) + `","grantType":"refresh_token","clientType":"extension"}`
 	return clineTokenRequest(clineRefreshPath, body)
 }
 
@@ -716,7 +716,7 @@ func clineTokenRequest(path, body string) uint32 {
 	url := clineBaseURL + path
 	urlPtr, urlLen := stringToPtr(url)
 	bodyPtr, bodyLen := stringToPtr(body)
-	hdrs := `{"Content-Type":"application/json","Accept":"application/json"}`
+	hdrs := buildClineHeaders("", "auth")
 	hdrsPtr, hdrsLen := stringToPtr(hdrs)
 	respPtr := hostHTTPPost(urlPtr, urlLen, bodyPtr, bodyLen, hdrsPtr, hdrsLen)
 	if respPtr == 0 {
